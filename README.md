@@ -34,7 +34,19 @@ python -m venv .venv
 .venv\Scripts\uvicorn app.main:app --reload
 ```
 
-Local env goes into `backend/.env` and must not be committed:
+Local env goes into `backend/.env` and must not be committed.
+
+SQLite local default:
+
+```bash
+APP_DATABASE_URL=sqlite:///./app.db
+```
+
+Supabase Postgres format:
+
+```bash
+APP_DATABASE_URL=postgresql+psycopg://postgres.PROJECT_REF:DB_PASSWORD@aws-0-region.pooler.supabase.com:6543/postgres
+```
 
 ```bash
 APP_TELEGRAM_BOT_TOKEN=...
