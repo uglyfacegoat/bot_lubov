@@ -1,23 +1,26 @@
 import { create } from "zustand";
 import {
-  achievements,
-  activityLogs,
-  dailyLogs,
-  dailyTasks,
-  nutritionDays,
-  profile,
-  quests,
-  rewards,
-  treatSlot,
-  weeklyReports,
-  weightLogs,
-} from "@/data/mockData";
+  api,
+  type ApiAchievement,
+  type ApiDailyLog,
+  type ApiDailyTask,
+  type ApiDailyTaskOption,
+  type ApiMealItem,
+  type ApiNutritionDay,
+  type ApiReward,
+  type ApiTreatSlot,
+  type ApiUserProfile,
+  type ApiWeightLog,
+} from "@/lib/api";
 import { telegram } from "@/lib/telegram";
 import type {
+  Achievement,
   ActivityLog,
   ActivityQuest,
   DailyLog,
   DailyTask,
+  DailyTaskOption,
+  MealItem,
   Mood,
   NutritionDay,
   PageId,
@@ -30,6 +33,9 @@ import type {
 
 interface AppState {
   activePage: PageId;
+  isHydrated: boolean;
+  isLoading: boolean;
+  error: string | null;
   profile: UserProfile;
   dailyLogs: DailyLog[];
   dailyTasks: DailyTask[];
@@ -40,206 +46,351 @@ interface AppState {
   rewards: Reward[];
   treatSlot: TreatSlot;
   weeklyReports: WeeklyReport[];
-  achievements: typeof achievements;
+  achievements: Achievement[];
+  hydrate: () => Promise<void>;
   setPage: (page: PageId) => void;
-  addWater: () => void;
-  removeWater: () => void;
-  changeWaterBy: (mode: "add" | "remove", liters: number) => void;
-  completeQuest: (id: string) => void;
-  selectDailyTaskOption: (taskId: string, optionId: string) => void;
-  completeDailyTask: (taskId: string) => void;
-  buyReward: (id: string) => void;
-  useTreatSlot: (option: string) => void;
-  postponeTreatSlot: () => void;
-  adminAddWeight: (weight: number) => void;
-  adminAddWater: (liters: number) => void;
-  adminAddActivity: (steps: number) => void;
-  adminSetNutrition: (inPlan: boolean) => void;
-  adminSetMood: (mood: Mood) => void;
-  adminMarkUnplannedFood: () => void;
-  adminAddPoints: (points: number) => void;
-  adminSpendPoints: (points: number) => void;
-  adminSetTreatAvailable: () => void;
-  adminCreateReward: (title: string) => void;
+  addWater: () => Promise<void>;
+  removeWater: () => Promise<void>;
+  changeWaterBy: (mode: "add" | "remove", liters: number) => Promise<void>;
+  completeQuest: (id: string) => Promise<void>;
+  selectDailyTaskOption: (taskId: string, optionId: string) => Promise<void>;
+  completeDailyTask: (taskId: string) => Promise<void>;
+  buyReward: (id: string) => Promise<void>;
+  useTreatSlot: (option: string) => Promise<void>;
+  postponeTreatSlot: () => Promise<void>;
+  adminAddWeight: (weight: number) => Promise<void>;
+  adminAddWater: (liters: number) => Promise<void>;
+  adminAddActivity: (steps: number) => Promise<void>;
+  adminSetNutrition: (inPlan: boolean) => Promise<void>;
+  adminSetMood: (mood: Mood) => Promise<void>;
+  adminMarkUnplannedFood: () => Promise<void>;
+  adminAddPoints: (points: number) => Promise<void>;
+  adminSpendPoints: (points: number) => Promise<void>;
+  adminSetTreatAvailable: () => Promise<void>;
+  adminCreateReward: (title: string) => Promise<void>;
 }
 
-const today = "2026-05-23";
+const emptyProfile: UserProfile = {
+  id: "",
+  name: "",
+  role: "participant",
+  systemDay: 0,
+  level: 1,
+  xp: 0,
+  xpToNextLevel: 1,
+  stars: 0,
+  weeklyProgressPercent: 0,
+  isAdmin: false,
+};
 
-function todayIndex(logs: DailyLog[]) {
-  const index = logs.findIndex((log) => log.date === today);
-  return index === -1 ? logs.length - 1 : index;
+const emptyTreatSlot: TreatSlot = {
+  id: "",
+  status: "locked",
+  availableAt: "",
+  daysUntilAvailable: 0,
+};
+
+function safeMood(value: string): Mood {
+  return ["calm", "good", "tired", "heavy", "inspired"].includes(value) ? (value as Mood) : "calm";
 }
 
-function award(profileValue: UserProfile, points: number): UserProfile {
-  const xp = profileValue.xp + points;
-  const leveled = xp >= profileValue.xpToNextLevel;
+function safeRole(value: string): UserProfile["role"] {
+  return value === "admin" || value === "viewer" || value === "participant" ? value : "participant";
+}
+
+function safeCategory(value: string): DailyTask["category"] {
+  return ["movement", "food", "water", "proof", "recovery"].includes(value) ? (value as DailyTask["category"]) : "movement";
+}
+
+function optionId(id: string): string {
+  return id.includes(":") ? id.split(":").pop() ?? id : id;
+}
+
+function mapProfile(item: ApiUserProfile): UserProfile {
   return {
-    ...profileValue,
-    stars: profileValue.stars + points,
-    xp: leveled ? xp - profileValue.xpToNextLevel : xp,
-    level: leveled ? profileValue.level + 1 : profileValue.level,
+    id: item.id,
+    name: item.name,
+    role: safeRole(item.role),
+    systemDay: item.system_day,
+    level: item.level,
+    xp: item.xp,
+    xpToNextLevel: item.xp_to_next_level,
+    stars: item.stars,
+    weeklyProgressPercent: item.weekly_progress_percent,
+    isAdmin: item.is_admin,
   };
 }
 
-export const useAppStore = create<AppState>((set) => ({
+function mapDailyLog(item: ApiDailyLog): DailyLog {
+  return {
+    date: item.log_date,
+    waterLiters: item.water_liters,
+    waterGoalLiters: item.water_goal_liters,
+    steps: item.steps,
+    activityGoal: item.activity_goal,
+    caloriesBurned: item.calories_burned ?? undefined,
+    nutritionInPlan: item.nutrition_in_plan,
+    mood: safeMood(item.mood),
+    unplannedFood: item.unplanned_food,
+    returnedToPlan: item.returned_to_plan,
+  };
+}
+
+function mapMeal(item: ApiMealItem): MealItem {
+  return {
+    id: item.id,
+    name: item.name,
+    amount: item.amount,
+    calories: item.calories,
+    protein: item.protein,
+    fat: item.fat,
+    carbs: item.carbs,
+    meal: item.meal === "breakfast" || item.meal === "lunch" || item.meal === "dinner" || item.meal === "snack" ? item.meal : "snack",
+  };
+}
+
+function mapNutritionDay(item: ApiNutritionDay): NutritionDay {
+  return {
+    date: item.log_date,
+    calorieGoal: item.calorie_goal,
+    proteinGoal: item.protein_goal,
+    fatGoal: item.fat_goal,
+    carbsGoal: item.carbs_goal,
+    meals: item.meals.map(mapMeal),
+  };
+}
+
+function mapWeightLog(item: ApiWeightLog): WeightLog {
+  return {
+    date: item.log_date,
+    weightKg: item.weight_kg,
+    note: item.note,
+  };
+}
+
+function mapTreatSlot(item: ApiTreatSlot): TreatSlot {
+  return {
+    id: item.id,
+    status: item.status === "available" || item.status === "used" || item.status === "postponed" ? item.status : "locked",
+    availableAt: item.available_at,
+    usedAt: item.used_at ?? undefined,
+    selectedOption: item.selected_option ?? undefined,
+    daysUntilAvailable: item.days_until_available,
+  };
+}
+
+function mapReward(item: ApiReward): Reward {
+  return {
+    id: item.id,
+    title: item.title,
+    price: item.price,
+    description: item.description,
+    purchasedCount: item.purchased_count,
+  };
+}
+
+function mapTaskOption(item: ApiDailyTaskOption): DailyTaskOption {
+  return {
+    id: optionId(item.id),
+    label: item.label,
+    points: item.points,
+  };
+}
+
+function mapDailyTask(item: ApiDailyTask): DailyTask {
+  return {
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    category: safeCategory(item.category),
+    selectedOptionId: item.selected_option_id ? optionId(item.selected_option_id) : undefined,
+    completed: item.completed,
+    options: item.options.map(mapTaskOption),
+  };
+}
+
+function mapAchievement(item: ApiAchievement): Achievement {
+  return {
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    unlocked: item.unlocked,
+  };
+}
+
+function activityFromLogs(logs: DailyLog[]): ActivityLog[] {
+  return logs.map((day) => ({
+    date: day.date,
+    steps: day.steps,
+    walkMinutes: day.steps >= day.activityGoal ? 40 : 25,
+    workoutDone: day.steps >= day.activityGoal + 1200,
+    stretchDone: day.returnedToPlan || day.waterLiters >= day.waterGoalLiters,
+  }));
+}
+
+function questsFromTasks(tasks: DailyTask[]): ActivityQuest[] {
+  return tasks.slice(0, 4).map((task) => {
+    const selected = task.options.find((option) => option.id === task.selectedOptionId) ?? task.options[0];
+    return {
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      points: selected?.points ?? 0,
+      done: task.completed,
+    };
+  });
+}
+
+function weeklyReportsFromLogs(logs: DailyLog[]): WeeklyReport[] {
+  if (logs.length === 0) return [];
+  return [
+    {
+      week: 1,
+      startDate: logs[0].date,
+      stabilityPercent: Math.round(
+        logs.reduce((sum, day) => sum + (day.waterLiters >= day.waterGoalLiters ? 50 : 0) + (day.steps >= day.activityGoal ? 50 : 0), 0) / logs.length,
+      ),
+      waterAverage: Number((logs.reduce((sum, day) => sum + day.waterLiters, 0) / logs.length).toFixed(1)),
+      activityAverage: Math.round(logs.reduce((sum, day) => sum + day.steps, 0) / logs.length),
+      note: "Сводка из backend",
+    },
+  ];
+}
+
+async function loadState() {
+  const [dashboard, progress, rewards, tasks, achievements] = await Promise.all([
+    api.dashboard(),
+    api.progress(),
+    api.rewards(),
+    api.tasks(),
+    api.achievements(),
+  ]);
+
+  const dailyLogs = progress.daily_logs.map(mapDailyLog);
+  const dailyTasks = tasks.map(mapDailyTask);
+  return {
+    profile: mapProfile(dashboard.profile),
+    dailyLogs,
+    dailyTasks,
+    nutritionDays: progress.nutrition_days.map(mapNutritionDay),
+    weightLogs: progress.weight_logs.map(mapWeightLog),
+    activityLogs: activityFromLogs(dailyLogs),
+    quests: questsFromTasks(dailyTasks),
+    rewards: rewards.map(mapReward),
+    treatSlot: mapTreatSlot(dashboard.treat_slot),
+    weeklyReports: weeklyReportsFromLogs(dailyLogs),
+    achievements: achievements.map(mapAchievement),
+  };
+}
+
+function todayDate(logs: DailyLog[]): string {
+  return logs[logs.length - 1]?.date ?? new Date().toISOString().slice(0, 10);
+}
+
+export const useAppStore = create<AppState>((set, get) => ({
   activePage: "dashboard",
-  profile,
-  dailyLogs,
-  dailyTasks,
-  nutritionDays,
-  weightLogs,
-  activityLogs,
-  quests,
-  rewards,
-  treatSlot,
-  weeklyReports,
-  achievements,
+  isHydrated: false,
+  isLoading: false,
+  error: null,
+  profile: emptyProfile,
+  dailyLogs: [],
+  dailyTasks: [],
+  nutritionDays: [],
+  weightLogs: [],
+  activityLogs: [],
+  quests: [],
+  rewards: [],
+  treatSlot: emptyTreatSlot,
+  weeklyReports: [],
+  achievements: [],
+  hydrate: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const next = await loadState();
+      set({ ...next, isHydrated: true, isLoading: false, error: null });
+    } catch (error) {
+      set({
+        isLoading: false,
+        error: error instanceof Error ? error.message : "Не удалось загрузить данные",
+      });
+    }
+  },
   setPage: (page) => {
     telegram.impact("light");
     set({ activePage: page });
   },
-  addWater: () =>
+  addWater: async () => get().changeWaterBy("add", 0.25),
+  removeWater: async () => get().changeWaterBy("remove", 0.25),
+  changeWaterBy: async (mode, liters) => {
+    await api.changeWater(mode, liters);
+    telegram.impact("light");
+    await get().hydrate();
+  },
+  completeQuest: async (id) => {
+    await get().completeDailyTask(id);
+  },
+  selectDailyTaskOption: async (taskId, optionId) => {
+    const task = mapDailyTask(await api.selectTaskOption(taskId, optionId));
     set((state) => {
-      const index = todayIndex(state.dailyLogs);
-      const nextLogs = [...state.dailyLogs];
-      const log = nextLogs[index];
-      const nextValue = Math.min(Number((log.waterLiters + 0.25).toFixed(2)), log.waterGoalLiters);
-      nextLogs[index] = { ...log, waterLiters: nextValue };
-      const reachedGoal = log.waterLiters < log.waterGoalLiters && nextValue === log.waterGoalLiters;
-      if (reachedGoal) telegram.success();
-      return {
-        dailyLogs: nextLogs,
-        profile: reachedGoal ? award(state.profile, 20) : state.profile,
-      };
-    }),
-  removeWater: () =>
+      const dailyTasks = state.dailyTasks.map((item) => (item.id === taskId ? task : item));
+      return { dailyTasks, quests: questsFromTasks(dailyTasks) };
+    });
+  },
+  completeDailyTask: async (taskId) => {
+    const task = mapDailyTask(await api.completeTask(taskId));
+    telegram.success();
     set((state) => {
-      const index = todayIndex(state.dailyLogs);
-      const nextLogs = [...state.dailyLogs];
-      const log = nextLogs[index];
-      nextLogs[index] = { ...log, waterLiters: Math.max(Number((log.waterLiters - 0.25).toFixed(2)), 0) };
-      return { dailyLogs: nextLogs };
-    }),
-  changeWaterBy: (mode, liters) =>
-    set((state) => {
-      const index = todayIndex(state.dailyLogs);
-      const nextLogs = [...state.dailyLogs];
-      const log = nextLogs[index];
-      const delta = mode === "add" ? liters : -liters;
-      const nextValue = Math.min(Math.max(Number((log.waterLiters + delta).toFixed(2)), 0), log.waterGoalLiters);
-      nextLogs[index] = { ...log, waterLiters: nextValue };
-      return { dailyLogs: nextLogs };
-    }),
-  completeQuest: (id) =>
-    set((state) => {
-      const quest = state.quests.find((item) => item.id === id);
-      if (!quest || quest.done) return state;
-      telegram.success();
-      return {
-        quests: state.quests.map((item) => (item.id === id ? { ...item, done: true } : item)),
-        profile: award(state.profile, quest.points),
-      };
-    }),
-  selectDailyTaskOption: (taskId, optionId) =>
-    set((state) => ({
-      dailyTasks: state.dailyTasks.map((task) => (task.id === taskId ? { ...task, selectedOptionId: optionId } : task)),
-    })),
-  completeDailyTask: (taskId) =>
-    set((state) => {
-      const task = state.dailyTasks.find((item) => item.id === taskId);
-      if (!task || task.completed) return state;
-      const option = task.options.find((item) => item.id === task.selectedOptionId) ?? task.options[0];
-      telegram.success();
-      return {
-        dailyTasks: state.dailyTasks.map((item) => (item.id === taskId ? { ...item, completed: true } : item)),
-        profile: award(state.profile, option.points),
-      };
-    }),
-  buyReward: (id) =>
-    set((state) => {
-      const reward = state.rewards.find((item) => item.id === id);
-      if (!reward || state.profile.stars < reward.price) return state;
-      telegram.success();
-      return {
-        rewards: state.rewards.map((item) => (item.id === id ? { ...item, purchasedCount: item.purchasedCount + 1 } : item)),
-        profile: { ...state.profile, stars: state.profile.stars - reward.price },
-      };
-    }),
-  useTreatSlot: (option) =>
-    set((state) => ({
-      treatSlot: {
-        ...state.treatSlot,
-        status: "used",
-        usedAt: today,
-        selectedOption: option,
-      },
-    })),
-  postponeTreatSlot: () =>
-    set((state) => ({
-      treatSlot: { ...state.treatSlot, status: "postponed", daysUntilAvailable: 1 },
-    })),
-  adminAddWeight: (weight) =>
-    set((state) => ({
-      weightLogs: [...state.weightLogs, { date: today, weightKg: weight, note: "Добавлено в админке" }],
-    })),
-  adminAddWater: (liters) =>
-    set((state) => {
-      const index = todayIndex(state.dailyLogs);
-      const nextLogs = [...state.dailyLogs];
-      nextLogs[index] = { ...nextLogs[index], waterLiters: Math.max(0, liters) };
-      return { dailyLogs: nextLogs };
-    }),
-  adminAddActivity: (steps) =>
-    set((state) => {
-      const index = todayIndex(state.dailyLogs);
-      const nextLogs = [...state.dailyLogs];
-      nextLogs[index] = { ...nextLogs[index], steps: Math.max(0, steps) };
-      return { dailyLogs: nextLogs };
-    }),
-  adminSetNutrition: (inPlan) =>
-    set((state) => {
-      const index = todayIndex(state.dailyLogs);
-      const nextLogs = [...state.dailyLogs];
-      nextLogs[index] = { ...nextLogs[index], nutritionInPlan: inPlan };
-      return {
-        dailyLogs: nextLogs,
-        profile: inPlan ? award(state.profile, 30) : state.profile,
-      };
-    }),
-  adminSetMood: (mood) =>
-    set((state) => {
-      const index = todayIndex(state.dailyLogs);
-      const nextLogs = [...state.dailyLogs];
-      nextLogs[index] = { ...nextLogs[index], mood };
-      return { dailyLogs: nextLogs, profile: award(state.profile, 10) };
-    }),
-  adminMarkUnplannedFood: () =>
-    set((state) => {
-      const index = todayIndex(state.dailyLogs);
-      const nextLogs = [...state.dailyLogs];
-      nextLogs[index] = { ...nextLogs[index], unplannedFood: true, returnedToPlan: true };
-      return { dailyLogs: nextLogs, profile: award(state.profile, 30) };
-    }),
-  adminAddPoints: (points) => set((state) => ({ profile: award(state.profile, Math.max(0, points)) })),
-  adminSpendPoints: (points) =>
-    set((state) => ({
-      profile: { ...state.profile, stars: Math.max(0, state.profile.stars - Math.max(0, points)) },
-    })),
-  adminSetTreatAvailable: () =>
-    set((state) => ({
-      treatSlot: { ...state.treatSlot, status: "available", daysUntilAvailable: 0 },
-    })),
-  adminCreateReward: (title) =>
-    set((state) => ({
-      rewards: [
-        {
-          id: crypto.randomUUID(),
-          title,
-          price: 500,
-          description: "Новая награда из админки",
-          purchasedCount: 0,
-        },
-        ...state.rewards,
-      ],
-    })),
+      const dailyTasks = state.dailyTasks.map((item) => (item.id === taskId ? task : item));
+      return { dailyTasks, quests: questsFromTasks(dailyTasks) };
+    });
+    await get().hydrate();
+  },
+  buyReward: async (id) => {
+    await api.buyReward(id);
+    telegram.success();
+    await get().hydrate();
+  },
+  useTreatSlot: async (option) => {
+    set({ treatSlot: mapTreatSlot(await api.useTreatSlot(option)) });
+  },
+  postponeTreatSlot: async () => {
+    set({ treatSlot: mapTreatSlot(await api.postponeTreatSlot()) });
+  },
+  adminAddWeight: async (weight) => {
+    await api.adminWeight(todayDate(get().dailyLogs), weight);
+    await get().hydrate();
+  },
+  adminAddWater: async (liters) => {
+    await api.adminDailyLog(todayDate(get().dailyLogs), { water_liters: Math.max(0, liters) });
+    await get().hydrate();
+  },
+  adminAddActivity: async (steps) => {
+    await api.adminDailyLog(todayDate(get().dailyLogs), { steps: Math.max(0, steps) });
+    await get().hydrate();
+  },
+  adminSetNutrition: async (inPlan) => {
+    await api.adminDailyLog(todayDate(get().dailyLogs), { nutrition_in_plan: inPlan });
+    await get().hydrate();
+  },
+  adminSetMood: async (mood) => {
+    await api.adminDailyLog(todayDate(get().dailyLogs), { mood });
+    await get().hydrate();
+  },
+  adminMarkUnplannedFood: async () => {
+    await api.adminDailyLog(todayDate(get().dailyLogs), { unplanned_food: true, returned_to_plan: true });
+    await get().hydrate();
+  },
+  adminAddPoints: async (points) => {
+    set({ profile: mapProfile(await api.adminPoints("add", Math.max(1, points))) });
+  },
+  adminSpendPoints: async (points) => {
+    set({ profile: mapProfile(await api.adminPoints("spend", Math.max(1, points))) });
+  },
+  adminSetTreatAvailable: async () => {
+    set({ treatSlot: mapTreatSlot(await api.adminTreatAvailable()) });
+  },
+  adminCreateReward: async (title) => {
+    await api.createReward(title);
+    await get().hydrate();
+  },
 }));

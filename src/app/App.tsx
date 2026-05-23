@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { Button } from "@/components/buttons/Button";
+import { GlassCard } from "@/components/cards/GlassCard";
 import { AppShell } from "@/components/layout/AppShell";
 import { telegram } from "@/lib/telegram";
 import { Activity } from "@/pages/Activity";
@@ -31,9 +33,36 @@ function CurrentPage() {
 }
 
 export default function App() {
+  const hydrate = useAppStore((state) => state.hydrate);
+  const isHydrated = useAppStore((state) => state.isHydrated);
+  const isLoading = useAppStore((state) => state.isLoading);
+  const error = useAppStore((state) => state.error);
+
   useEffect(() => {
     telegram.init();
-  }, []);
+    void hydrate();
+  }, [hydrate]);
+
+  if (!isHydrated) {
+    return (
+      <AppShell>
+        <div className="flex min-h-[70svh] items-center">
+          <GlassCard className="w-full p-5 text-center">
+            <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-aqua/25 border-t-aqua" />
+            <h1 className="text-xl font-extrabold text-white">{isLoading ? "Загружаю данные" : "Backend подключается"}</h1>
+            <p className="mt-2 text-sm leading-6 text-soft">
+              {error ? "Render мог уснуть. Первый запуск на free-тарифе иногда занимает до минуты." : "Берём актуальные цифры из Supabase через API."}
+            </p>
+            {error ? (
+              <Button className="mt-4 w-full" onClick={() => void hydrate()}>
+                Повторить
+              </Button>
+            ) : null}
+          </GlassCard>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>

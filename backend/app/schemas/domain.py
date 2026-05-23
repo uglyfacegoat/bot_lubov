@@ -165,6 +165,16 @@ class TaskSelectIn(BaseModel):
     option_id: str
 
 
+class AdminPointsIn(BaseModel):
+    mode: Literal["add", "spend"]
+    points: int = Field(gt=0, le=10000)
+
+
+class AdminTreatSlotIn(BaseModel):
+    status: Literal["locked", "available", "used", "postponed"]
+    days_until_available: int = Field(ge=0, le=30)
+
+
 class AdminWeightIn(BaseModel):
     log_date: date
     weight_kg: float = Field(gt=20, lt=300)

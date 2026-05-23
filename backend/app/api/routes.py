@@ -23,6 +23,8 @@ from app.models.domain import (
 from app.schemas.domain import (
     AchievementOut,
     AdminDailyLogIn,
+    AdminPointsIn,
+    AdminTreatSlotIn,
     AdminWeightIn,
     DailyLogOut,
     DailyTaskOut,
@@ -242,6 +244,18 @@ def use_treat_slot(option: str, db: Session = Depends(get_db)) -> TreatSlot:
     return slot
 
 
+@router.post("/treat-slot/postpone", response_model=TreatSlotOut)
+def postpone_treat_slot(db: Session = Depends(get_db)) -> TreatSlot:
+    slot = db.scalars(select(TreatSlot).where(TreatSlot.user_id == USER_ID)).first()
+    if slot is None:
+        raise HTTPException(status_code=404, detail="Treat slot not found")
+    slot.status = "postponed"
+    slot.days_until_available = 1
+    db.commit()
+    db.refresh(slot)
+    return slot
+
+
 @router.get("/achievements", response_model=list[AchievementOut])
 def list_achievements(db: Session = Depends(get_db)) -> list[Achievement]:
     return list(db.scalars(select(Achievement)).all())
@@ -278,3 +292,27 @@ def admin_update_daily_log(payload: AdminDailyLogIn, db: Session = Depends(get_d
     db.commit()
     db.refresh(log)
     return log
+
+
+@router.post("/admin/points", response_model=UserProfileOut)
+def admin_update_points(payload: AdminPointsIn, db: Session = Depends(get_db)) -> UserProfile:
+    profile = get_profile(db)
+    if payload.mode == "add":
+        award_points(profile, payload.points)
+    else:
+        profile.stars = max(0, profile.stars - payload.points)
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
+@router.patch("/admin/treat-slot", response_model=TreatSlotOut)
+def admin_update_treat_slot(payload: AdminTreatSlotIn, db: Session = Depends(get_db)) -> TreatSlot:
+    slot = db.scalars(select(TreatSlot).where(TreatSlot.user_id == USER_ID)).first()
+    if slot is None:
+        raise HTTPException(status_code=404, detail="Treat slot not found")
+    slot.status = payload.status
+    slot.days_until_available = payload.days_until_available
+    db.commit()
+    db.refresh(slot)
+    return slot
