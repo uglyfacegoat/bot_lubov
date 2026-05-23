@@ -28,6 +28,8 @@ import type {
   TreatSlot,
   UserProfile,
   WeeklyReport,
+  HealthIntegration,
+  ViewMode,
   WeightLog,
 } from "@/types";
 
@@ -36,6 +38,8 @@ interface AppState {
   isHydrated: boolean;
   isLoading: boolean;
   error: string | null;
+  viewMode: ViewMode;
+  healthIntegration: HealthIntegration;
   profile: UserProfile;
   dailyLogs: DailyLog[];
   dailyTasks: DailyTask[];
@@ -66,8 +70,9 @@ interface AppState {
   adminMarkUnplannedFood: () => Promise<void>;
   adminAddPoints: (points: number) => Promise<void>;
   adminSpendPoints: (points: number) => Promise<void>;
-  adminSetTreatAvailable: () => Promise<void>;
-  adminCreateReward: (title: string) => Promise<void>;
+  setViewMode: (mode: ViewMode) => void;
+  adminSetTreatSlot: (status: TreatSlot["status"], availableAt?: string) => Promise<void>;
+  adminCreateReward: (title: string, price?: number, description?: string) => Promise<void>;
 }
 
 const emptyProfile: UserProfile = {
@@ -252,7 +257,7 @@ function weeklyReportsFromLogs(logs: DailyLog[]): WeeklyReport[] {
       ),
       waterAverage: Number((logs.reduce((sum, day) => sum + day.waterLiters, 0) / logs.length).toFixed(1)),
       activityAverage: Math.round(logs.reduce((sum, day) => sum + day.steps, 0) / logs.length),
-      note: "Сводка из backend",
+      note: "РЎРІРѕРґРєР° РёР· backend",
     },
   ];
 }
@@ -292,6 +297,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   isHydrated: false,
   isLoading: false,
   error: null,
+  viewMode: "user",
+  healthIntegration: {
+    provider: "apple-health",
+    status: "planned",
+  },
   profile: emptyProfile,
   dailyLogs: [],
   dailyTasks: [],
@@ -319,6 +329,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     telegram.impact("light");
     set({ activePage: page });
   },
+  setViewMode: (mode) => set({ viewMode: mode, activePage: "dashboard" }),
   addWater: async () => get().changeWaterBy("add", 0.25),
   removeWater: async () => get().changeWaterBy("remove", 0.25),
   changeWaterBy: async (mode, liters) => {
@@ -338,7 +349,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   completeDailyTask: async (taskId) => {
     const task = mapDailyTask(await api.completeTask(taskId));
-    telegram.success();
+    telegram.impact("medium");
     set((state) => {
       const dailyTasks = state.dailyTasks.map((item) => (item.id === taskId ? task : item));
       return { dailyTasks, quests: questsFromTasks(dailyTasks) };
@@ -386,11 +397,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   adminSpendPoints: async (points) => {
     set({ profile: mapProfile(await api.adminPoints("spend", Math.max(1, points))) });
   },
-  adminSetTreatAvailable: async () => {
-    set({ treatSlot: mapTreatSlot(await api.adminTreatAvailable()) });
+  adminSetTreatSlot: async (status, availableAt) => {
+    const today = todayDate(get().dailyLogs);
+    const targetDate = availableAt || today;
+    const diff = Math.max(0, Math.ceil((new Date(targetDate).getTime() - new Date(today).getTime()) / 86400000));
+    set({ treatSlot: mapTreatSlot(await api.adminTreatSlot({ status, days_until_available: diff, available_at: targetDate })) });
   },
-  adminCreateReward: async (title) => {
-    await api.createReward(title);
+  adminCreateReward: async (title, price = 500, description = "Награда добавлена в админке") => {
+    await api.createReward(title, price, description);
     await get().hydrate();
   },
 }));

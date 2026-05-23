@@ -16,12 +16,30 @@ const navItems: Array<{ id: PageId; label: string; icon: typeof Home }> = [
 export function AppShell({ children }: { children: ReactNode }) {
   const activePage = useAppStore((state) => state.activePage);
   const setPage = useAppStore((state) => state.setPage);
+  const viewMode = useAppStore((state) => state.viewMode);
+  const setViewMode = useAppStore((state) => state.setViewMode);
 
   return (
     <div className="relative z-10 mx-auto min-h-svh max-w-[460px] overflow-hidden bg-[#07070d] shadow-[0_0_90px_rgba(0,0,0,0.62)]">
       <div className="pointer-events-none fixed inset-x-0 top-0 mx-auto h-56 max-w-[460px] bg-[radial-gradient(circle_at_50%_0%,rgba(255,143,199,0.1),transparent_66%)]" />
       <div className="pointer-events-none fixed inset-x-0 bottom-0 mx-auto h-36 max-w-[460px] bg-[radial-gradient(circle_at_50%_100%,rgba(116,216,255,0.07),transparent_62%)]" />
       <main className="safe-bottom relative px-4 pt-5">
+        <div className="mb-4 grid grid-cols-2 gap-2 rounded-2xl bg-white/[0.04] p-1">
+          <button
+            type="button"
+            onClick={() => setViewMode("user")}
+            className={`rounded-xl px-3 py-2 text-xs font-bold ${viewMode === "user" ? "bg-aqua text-ink" : "text-soft"}`}
+          >
+            Как пользователь
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("admin")}
+            className={`rounded-xl px-3 py-2 text-xs font-bold ${viewMode === "admin" ? "bg-gold text-ink" : "text-soft"}`}
+          >
+            Как админ
+          </button>
+        </div>
         <AnimatePresence mode="wait">
           <motion.div
             key={activePage}

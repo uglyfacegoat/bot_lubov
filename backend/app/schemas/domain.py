@@ -173,6 +173,7 @@ class AdminPointsIn(BaseModel):
 class AdminTreatSlotIn(BaseModel):
     status: Literal["locked", "available", "used", "postponed"]
     days_until_available: int = Field(ge=0, le=30)
+    available_at: date | None = None
 
 
 class AdminWeightIn(BaseModel):

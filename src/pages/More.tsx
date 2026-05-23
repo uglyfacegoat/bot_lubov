@@ -15,6 +15,8 @@ const items: Array<{ page: PageId; title: string; text: string; icon: typeof Dum
 
 export function More() {
   const setPage = useAppStore((state) => state.setPage);
+  const viewMode = useAppStore((state) => state.viewMode);
+  const visibleItems = viewMode === "admin" ? items : items.filter((item) => item.page !== "admin");
 
   return (
     <div className="space-y-4">
@@ -24,7 +26,7 @@ export function More() {
         <p className="text-sm leading-6 text-soft">Система построена на поддержке: действия дают звезды, но вес не дает баллы.</p>
       </GlassCard>
       <div className="space-y-3">
-        {items.map((item) => {
+        {visibleItems.map((item) => {
           const Icon = item.icon;
           return (
             <button key={item.page} type="button" onClick={() => setPage(item.page)} className="glass flex w-full items-center gap-4 rounded-[24px] p-5 text-left">

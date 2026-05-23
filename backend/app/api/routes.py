@@ -212,12 +212,7 @@ def complete_task(task_id: str, db: Session = Depends(get_db)) -> DailyTask:
         raise HTTPException(status_code=404, detail="Task not found")
     if task.completed:
         return task
-    selected = next(
-        (option for option in task.options if option.id == task.selected_option_id or option.id.endswith(f":{task.selected_option_id}")),
-        task.options[0],
-    )
     task.completed = True
-    award_points(get_profile(db), selected.points)
     db.commit()
     db.refresh(task)
     return task
@@ -313,6 +308,11 @@ def admin_update_treat_slot(payload: AdminTreatSlotIn, db: Session = Depends(get
         raise HTTPException(status_code=404, detail="Treat slot not found")
     slot.status = payload.status
     slot.days_until_available = payload.days_until_available
+    if payload.available_at is not None:
+        slot.available_at = payload.available_at
+    if payload.status != "used":
+        slot.used_at = None
+        slot.selected_option = None
     db.commit()
     db.refresh(slot)
     return slot

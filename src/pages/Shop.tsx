@@ -20,6 +20,12 @@ export function Shop() {
           <Star fill="currentColor" size={23} />
         </div>
       </GlassCard>
+      {rewards.length === 0 ? (
+        <GlassCard className="p-5 text-center">
+          <p className="text-lg font-extrabold text-white">Магазин пока пуст</p>
+          <p className="mt-2 text-sm leading-6 text-soft">Награды добавляет админ. Купленные награды не отменяются.</p>
+        </GlassCard>
+      ) : null}
       <div className="space-y-3">
         {rewards.map((reward) => {
           const missing = reward.price - profile.stars;

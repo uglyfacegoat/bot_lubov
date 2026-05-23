@@ -18,7 +18,7 @@ export function Quests() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Задания дня" subtitle="Можно выбрать объем и получить звезды" />
+      <PageHeader title="Задания дня" subtitle="Выбрать объем и отправить на проверку. Звезды начисляет админ после доказательства." />
       {dailyTasks.map((task) => {
         const Icon = icons[task.category];
         const selected = task.options.find((option) => option.id === task.selectedOptionId) ?? task.options[0];
@@ -41,17 +41,18 @@ export function Quests() {
                     key={option.id}
                     type="button"
                     onClick={() => selectDailyTaskOption(task.id, option.id)}
-                    className={`rounded-2xl px-3 py-3 text-left ${active ? "bg-aqua text-ink" : "bg-white/[0.045] text-white"}`}
+                    disabled={task.completed}
+                    className={`rounded-2xl px-3 py-3 text-left disabled:opacity-60 ${active ? "bg-aqua text-ink" : "bg-white/[0.045] text-white"}`}
                   >
                     <p className="text-xs font-extrabold">{option.label}</p>
-                    <p className="mt-1 text-[11px] font-bold opacity-80">+{option.points} ★</p>
+                    <p className="mt-1 text-[11px] font-bold opacity-80">{option.points} звезд после проверки</p>
                   </button>
                 );
               })}
             </div>
             <Button className="mt-4 w-full" disabled={task.completed} onClick={() => completeDailyTask(task.id)}>
               {task.completed ? <CheckCircle2 size={18} /> : null}
-              {task.completed ? "Выполнено" : `Отметить: +${selected.points} звезд`}
+              {task.completed ? "Отправлено на проверку" : `Отправить на проверку: ${selected.points} звезд`}
             </Button>
           </GlassCard>
         );

@@ -26,6 +26,8 @@ export interface UserProfile {
   isAdmin: boolean;
 }
 
+export type ViewMode = "user" | "admin";
+
 export interface DailyLog {
   date: string;
   waterLiters: number;
@@ -92,6 +94,12 @@ export interface TreatSlot {
   usedAt?: string;
   selectedOption?: string;
   daysUntilAvailable: number;
+}
+
+export interface HealthIntegration {
+  provider: "apple-health";
+  status: "not_connected" | "planned" | "connected";
+  lastSync?: string;
 }
 
 export interface Reward {

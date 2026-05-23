@@ -195,9 +195,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ mode, points }),
     }),
-  adminTreatAvailable: () =>
+  adminTreatSlot: (payload: { status: "locked" | "available" | "used" | "postponed"; days_until_available: number; available_at?: string }) =>
     request<ApiTreatSlot>("/admin/treat-slot", {
       method: "PATCH",
-      body: JSON.stringify({ status: "available", days_until_available: 0 }),
+      body: JSON.stringify(payload),
     }),
 };

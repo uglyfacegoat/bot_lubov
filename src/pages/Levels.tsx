@@ -8,7 +8,7 @@ const levels = Array.from({ length: 20 }, (_, index) => {
   const level = index + 1;
   return {
     level,
-    stars: level * 80 + (level > 10 ? 120 : 0),
+    stars: level <= 5 ? level * 10 : 50 + (level - 5) * 15,
     title: level % 5 === 0 ? "Большая награда" : level % 3 === 0 ? "Бонус стабильности" : "Новый уровень",
   };
 });
