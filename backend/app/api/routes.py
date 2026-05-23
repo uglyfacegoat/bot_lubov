@@ -1,9 +1,13 @@
 from datetime import date
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException
+import httpx
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.bot import TelegramBot
+from app.core import get_settings
 from app.db.session import get_db
 from app.models.domain import (
     Achievement,
@@ -56,6 +60,21 @@ def get_today_log(db: Session) -> DailyLog:
 @router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@router.post("/telegram/webhook")
+async def telegram_webhook(
+    request: Request,
+    x_telegram_bot_api_secret_token: str | None = Header(default=None),
+) -> dict[str, bool]:
+    settings = get_settings()
+    if settings.telegram_webhook_secret and x_telegram_bot_api_secret_token != settings.telegram_webhook_secret:
+        raise HTTPException(status_code=403, detail="Invalid Telegram webhook secret")
+
+    update: dict[str, Any] = await request.json()
+    async with httpx.AsyncClient(timeout=15) as client:
+        await TelegramBot()._handle_update(client, update)
+    return {"ok": True}
 
 
 @router.get("/profile", response_model=UserProfileOut)
