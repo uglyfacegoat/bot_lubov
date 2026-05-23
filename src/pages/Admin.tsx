@@ -39,7 +39,7 @@ const actions: Array<{ id: AdminAction; title: string; text: string; icon: typeo
   { id: "addPoints", title: "Начислить баллы", text: "За полезные действия", icon: Coins },
   { id: "spendPoints", title: "Списать баллы", text: "Ручная корректировка", icon: Coins },
   { id: "treat", title: "Настроить слот", text: "Сделать доступным", icon: Settings2 },
-  { id: "reward", title: "Создать награду", text: "Mock reward", icon: Gift },
+  { id: "reward", title: "Создать награду", text: "Добавить вариант в магазин", icon: Gift },
 ];
 
 export function Admin() {
@@ -52,7 +52,7 @@ export function Admin() {
       <div className="space-y-4">
         <PageHeader title="Админ" subtitle="Доступ закрыт" />
         <GlassCard>
-          <p className="text-soft">Mock-флаг `isAdmin` выключен.</p>
+          <p className="text-soft">Админский доступ выключен.</p>
         </GlassCard>
       </div>
     );
@@ -83,10 +83,10 @@ export function Admin() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Админ режим" subtitle="Mock управление системой" />
+      <PageHeader title="Админ режим" subtitle="Управление системой через backend" />
       <GlassCard>
         <p className="text-sm leading-6 text-soft">
-          Здесь действия меняют zustand store. Минусовые баллы за еду, вес или сложный день не используются.
+            Здесь действия сохраняются через backend. Минусовые баллы за еду, вес или сложный день не используются.
         </p>
       </GlassCard>
       <div className="grid grid-cols-2 gap-3">
@@ -125,7 +125,7 @@ export function Admin() {
               />
             </label>
           ) : (
-            <p className="text-sm leading-6 text-soft">Подтвердите действие. Оно сразу применится к mock-состоянию.</p>
+            <p className="text-sm leading-6 text-soft">Подтвердите действие. Оно сразу сохранится в системе.</p>
           )}
           <Button className="w-full" onClick={submit}>Применить</Button>
         </div>

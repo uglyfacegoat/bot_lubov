@@ -10,7 +10,7 @@ const items: Array<{ page: PageId; title: string; text: string; icon: typeof Dum
   { page: "levels", title: "Уровни", text: "Дорога до 20 уровня", icon: Crown },
   { page: "treat", title: "Вкусный слот", text: "Запланированная радость", icon: Sparkles },
   { page: "rules", title: "Правила", text: "Без наказаний и стыда", icon: ScrollText },
-  { page: "admin", title: "Админ", text: "Ручное управление mock data", icon: Settings },
+  { page: "admin", title: "Админ", text: "Ручное управление данными", icon: Settings },
 ];
 
 export function More() {

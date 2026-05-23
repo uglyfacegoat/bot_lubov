@@ -53,7 +53,7 @@ export function TreatSlot() {
         <GlassCard>
           <div className="flex items-center gap-3">
             <Clock className="text-aqua" size={22} />
-            <p className="text-sm leading-6 text-soft">Можно открыть слот в админке для демо или дождаться даты mock-состояния.</p>
+            <p className="text-sm leading-6 text-soft">Можно открыть слот в админке или дождаться запланированной даты.</p>
           </div>
         </GlassCard>
       ) : null}
