@@ -39,6 +39,8 @@ def seed_db(db: Session) -> None:
         )
     )
 
+    db.flush()
+
     daily_logs = [
         ("2026-05-17", 2.0, 6900, 2140, True, "calm"),
         ("2026-05-18", 1.6, 6200, 2070, True, "good"),
