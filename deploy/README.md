@@ -4,6 +4,7 @@ This setup runs the Mini App on one HTTPS domain:
 
 - `web`: built React app served by Caddy
 - `api`: FastAPI backend behind `/api`
+- `db`: local Postgres database stored in a Docker volume
 - Caddy automatically gets and renews TLS certificates
 
 ## DNS
@@ -47,7 +48,8 @@ Edit `.env.production`:
 
 - `APP_DOMAIN`: your domain, for example `love.example.com`
 - `APP_TELEGRAM_WEBAPP_URL`: `https://your-domain`
-- `APP_DATABASE_URL`: Supabase pooled database URL
+- `POSTGRES_PASSWORD`: long random database password
+- `APP_DATABASE_URL`: local Docker Postgres URL with the same password
 - `APP_TELEGRAM_BOT_TOKEN`: Telegram bot token
 - `APP_TELEGRAM_WEBHOOK_SECRET`: long random string
 - `APP_CORS_ORIGINS`: `["https://your-domain"]`
@@ -85,6 +87,16 @@ docker compose --env-file .env.production up -d --build
 ```
 
 Important: `.env.production` stays only on the server and is not committed.
+
+## Local Postgres
+
+The production setup does not require Supabase. Postgres runs on the VPS inside Docker:
+
+```text
+postgres_data -> /var/lib/postgresql/data
+```
+
+Do not delete the `postgres_data` Docker volume unless you intentionally want to wipe production data.
 
 ## Telegram webhook
 
