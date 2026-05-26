@@ -1,0 +1,12 @@
+.git
+node_modules
+dist
+.env
+.env.*
+backend/.env
+backend/app.db
+backend/.venv
+backend/__pycache__
+backend/**/*.pyc
+localtunnel.*.log
+.playwright-mcp
